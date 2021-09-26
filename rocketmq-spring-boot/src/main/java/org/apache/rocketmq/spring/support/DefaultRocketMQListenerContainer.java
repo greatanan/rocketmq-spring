@@ -17,21 +17,10 @@
 
 package org.apache.rocketmq.spring.support;
 
-import java.lang.reflect.Method;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.nio.charset.Charset;
-import java.util.List;
-import java.util.Objects;
 import org.apache.rocketmq.client.AccessChannel;
 import org.apache.rocketmq.client.consumer.DefaultMQPushConsumer;
 import org.apache.rocketmq.client.consumer.MessageSelector;
-import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyContext;
-import org.apache.rocketmq.client.consumer.listener.ConsumeConcurrentlyStatus;
-import org.apache.rocketmq.client.consumer.listener.ConsumeOrderlyContext;
-import org.apache.rocketmq.client.consumer.listener.ConsumeOrderlyStatus;
-import org.apache.rocketmq.client.consumer.listener.MessageListenerConcurrently;
-import org.apache.rocketmq.client.consumer.listener.MessageListenerOrderly;
+import org.apache.rocketmq.client.consumer.listener.*;
 import org.apache.rocketmq.client.consumer.rebalance.AllocateMessageQueueAveragely;
 import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.client.producer.SendCallback;
@@ -66,6 +55,21 @@ import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.util.Assert;
 import org.springframework.util.MimeTypeUtils;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.nio.charset.Charset;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * // my:
+ * spring rocketmq底层通过DefaultRocketMQListenerContainer这个类封装原生的Consumer对象来消费消息，
+ * 其内部的DefaultMessageListenerConcurrently和DefaultMessageListenerOrderly两个消息监听器会根据我们的业务是否抛出异常来决定消息是否ack！
+ * ————————————————
+ * 版权声明：本文为CSDN博主「阿踏踏踏踏」的原创文章，遵循CC 4.0 BY-SA版权协议，转载请附上原文出处链接及本声明。
+ * 原文链接：https://blog.csdn.net/u011535541/article/details/116165642
+ */
 @SuppressWarnings("WeakerAccess")
 public class DefaultRocketMQListenerContainer implements InitializingBean,
     RocketMQListenerContainer, SmartLifecycle, ApplicationContextAware {
@@ -313,6 +317,8 @@ public class DefaultRocketMQListenerContainer implements InitializingBean,
 
     @Override
     public void afterPropertiesSet() throws Exception {
+
+        // my: initRocketMQPushConsumer方法是关键，看名字就知道初始化了rocketmq原生的Consumer并进行队列监听
         initRocketMQPushConsumer();
 
         this.messageType = getMessageType();
@@ -356,6 +362,7 @@ public class DefaultRocketMQListenerContainer implements InitializingBean,
                     log.debug("consume {} cost: {} ms", messageExt.getMsgId(), costTime);
                 } catch (Exception e) {
                     log.warn("consume message failed. messageExt:{}, error:{}", messageExt, e);
+                    // my: 设置消息消费重试策略
                     context.setDelayLevelWhenNextConsume(delayLevelWhenNextConsume);
                     return ConsumeConcurrentlyStatus.RECONSUME_LATER;
                 }
@@ -379,6 +386,7 @@ public class DefaultRocketMQListenerContainer implements InitializingBean,
                     log.info("consume {} cost: {} ms", messageExt.getMsgId(), costTime);
                 } catch (Exception e) {
                     log.warn("consume message failed. messageExt:{}", messageExt, e);
+                    // my: 设置消息消费重试策略
                     context.setSuspendCurrentQueueTimeMillis(suspendCurrentQueueTimeMillis);
                     return ConsumeOrderlyStatus.SUSPEND_CURRENT_QUEUE_A_MOMENT;
                 }
@@ -388,9 +396,11 @@ public class DefaultRocketMQListenerContainer implements InitializingBean,
         }
     }
 
+    // my: 处理消息
     private void handleMessage(
         MessageExt messageExt) throws MQClientException, RemotingException, InterruptedException {
         if (rocketMQListener != null) {
+            // my: 处理我们自定义的消息
             rocketMQListener.onMessage(doConvertMessage(messageExt));
         } else if (rocketMQReplyListener != null) {
             Object replyContent = rocketMQReplyListener.onMessage(doConvertMessage(messageExt));
@@ -539,6 +549,11 @@ public class DefaultRocketMQListenerContainer implements InitializingBean,
         return Object.class;
     }
 
+    /**
+     * // my:
+     *          initRocketMQPushConsumer（）方法很长，我不贴出来了，方法里面创建消费者对象，并根据上面获取到的注解信息，设置订阅的topic 、过滤条件、广播消费还是并发消费等等。
+     * @throws MQClientException
+     */
     private void initRocketMQPushConsumer() throws MQClientException {
         if (rocketMQListener == null && rocketMQReplyListener == null) {
             throw new IllegalArgumentException("Property 'rocketMQListener' or 'rocketMQReplyListener' is required");
@@ -600,6 +615,7 @@ public class DefaultRocketMQListenerContainer implements InitializingBean,
                 throw new IllegalArgumentException("Property 'selectorType' was wrong.");
         }
 
+        // my: 设置MessageListener对象  这段代码中设置了消费的模式是顺序消费还是并发消费，具体的消费逻辑在这个两个类中实现
         switch (consumeMode) {
             case ORDERLY:
                 consumer.setMessageListener(new DefaultMessageListenerOrderly());

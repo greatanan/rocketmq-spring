@@ -17,10 +17,6 @@
 
 package org.apache.rocketmq.spring.autoconfigure;
 
-import java.util.Collections;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
 import org.apache.rocketmq.client.AccessChannel;
 import org.apache.rocketmq.spring.annotation.ConsumeMode;
 import org.apache.rocketmq.spring.annotation.MessageModel;
@@ -43,6 +39,11 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.core.env.StandardEnvironment;
 import org.springframework.util.StringUtils;
+
+import java.util.Collections;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 @Configuration
 public class ListenerContainerConfiguration implements ApplicationContextAware, SmartInitializingSingleton {
@@ -117,6 +118,7 @@ public class ListenerContainerConfiguration implements ApplicationContextAware, 
             DefaultRocketMQListenerContainer.class);
         if (!container.isRunning()) {
             try {
+                // my: 开始消费监听
                 container.start();
             } catch (Exception e) {
                 log.error("Started container failed. {}", container, e);

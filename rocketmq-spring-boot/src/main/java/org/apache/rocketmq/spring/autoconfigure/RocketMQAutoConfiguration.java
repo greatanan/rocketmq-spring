@@ -17,7 +17,6 @@
 
 package org.apache.rocketmq.spring.autoconfigure;
 
-import javax.annotation.PostConstruct;
 import org.apache.rocketmq.client.AccessChannel;
 import org.apache.rocketmq.client.MQAdmin;
 import org.apache.rocketmq.client.producer.DefaultMQProducer;
@@ -40,6 +39,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.core.env.Environment;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
+
+import javax.annotation.PostConstruct;
 
 @Configuration
 @EnableConfigurationProperties(RocketMQProperties.class)
@@ -67,13 +68,19 @@ public class RocketMQAutoConfiguration {
         }
     }
 
+    /**
+     *  为容器中放入生产者
+     */
     @Bean
     @ConditionalOnMissingBean(DefaultMQProducer.class)
     @ConditionalOnProperty(prefix = "rocketmq", value = {"name-server", "producer.group"})
     public DefaultMQProducer defaultMQProducer(RocketMQProperties rocketMQProperties) {
+
         RocketMQProperties.Producer producerConfig = rocketMQProperties.getProducer();
+
         String nameServer = rocketMQProperties.getNameServer();
         String groupName = producerConfig.getGroup();
+
         Assert.hasText(nameServer, "[rocketmq.name-server] must not be null");
         Assert.hasText(groupName, "[rocketmq.producer.group] must not be null");
 
@@ -100,6 +107,9 @@ public class RocketMQAutoConfiguration {
         return producer;
     }
 
+    /**
+     * // my: 往容器中放入一个RocketMQTemplate, 为其设置生产者和消息转换器
+     */
     @Bean(destroyMethod = "destroy")
     @ConditionalOnBean(DefaultMQProducer.class)
     @ConditionalOnMissingBean(name = ROCKETMQ_TEMPLATE_DEFAULT_GLOBAL_NAME)
